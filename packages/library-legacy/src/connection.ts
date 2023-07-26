@@ -28,6 +28,14 @@ import {
 import type {Struct} from 'superstruct';
 import RpcClient from 'jayson/lib/client/browser';
 import {JSONRPCError} from 'jayson';
+import {
+  Base58EncodedAddress,
+  Blockhash,
+  createDefaultRpcTransport,
+  createSolanaRpc,
+} from '@solana/web3.js-experimental';
+import {SolanaRpcMethods} from '@solana/rpc-core';
+import type {TransactionSignature} from '@solana/rpc-core/dist/types/transaction-signature';
 
 import {EpochSchedule} from './epoch-schedule';
 import {SendTransactionError, SolanaJSONRPCError} from './errors';
@@ -54,22 +62,16 @@ import {
   TransactionExpiredTimeoutError,
 } from './transaction/expiry-custom-errors';
 import {makeWebsocketUrl} from './utils/makeWebsocketUrl';
-import type {Blockhash} from './blockhash';
+// import type {Blockhash} from './blockhash';
 import type {FeeCalculator} from './fee-calculator';
-import type {TransactionSignature} from './transaction';
+// import type {TransactionSignature} from './transaction';
 import type {CompiledInstruction} from './message';
 /** EXPERIMENTAL: Imports */
-import {Base58EncodedAddress} from '../../keys';
-import {SolanaRpcMethods} from '../../rpc-core/src';
-import {Blockhash as EXPERIMENTAL_Blockhash} from '../../rpc-core/src/blockhash';
-import {TransactionSignature as EXPERIMENTAL_TransactionSignature} from '../../rpc-core/src/transaction-signature';
 import {
   Commitment as EXPERIMENTAL_Commitment,
   Slot,
   U64UnsafeBeyond2Pow53Minus1,
 } from '../../rpc-core/src/rpc-methods/common';
-import {createDefaultRpcTransport, createSolanaRpc} from '../../library/src';
-import type {IRpcTransport} from '../../rpc-transport/dist/types/transports/transport-types';
 import type {Rpc} from '../../rpc-transport/dist/types/json-rpc-types';
 
 const PublicKeyFromString = coerce(
@@ -794,23 +796,6 @@ export type InflationReward = {
   commission?: number | null;
 };
 
-/**
- * Expected JSON RPC response for the "getInflationReward" message
- */
-const GetInflationRewardResult = jsonRpcResult(
-  array(
-    nullable(
-      pick({
-        epoch: number(),
-        effectiveSlot: number(),
-        amount: number(),
-        postBalance: number(),
-        commission: optional(nullable(number())),
-      }),
-    ),
-  ),
-);
-
 export type RecentPrioritizationFees = {
   /** slot in which the fee was observed */
   slot: number;
@@ -871,23 +856,6 @@ export type EpochInfo = {
   blockHeight?: number;
   transactionCount?: number;
 };
-
-const GetEpochInfoResult = pick({
-  epoch: number(),
-  slotIndex: number(),
-  slotsInEpoch: number(),
-  absoluteSlot: number(),
-  blockHeight: optional(number()),
-  transactionCount: optional(number()),
-});
-
-const GetEpochScheduleResult = pick({
-  slotsPerEpoch: number(),
-  leaderScheduleSlotOffset: number(),
-  warmup: boolean(),
-  firstNormalEpoch: number(),
-  firstNormalSlot: number(),
-});
 
 /**
  * Leader schedule
@@ -1721,24 +1689,9 @@ const GetRecentPrioritizationFeesRpcResult = jsonRpcResult(
 );
 
 /**
- * Expected JSON RPC response for the "getEpochInfo" message
- */
-const GetEpochInfoRpcResult = jsonRpcResult(GetEpochInfoResult);
-
-/**
- * Expected JSON RPC response for the "getEpochSchedule" message
- */
-const GetEpochScheduleRpcResult = jsonRpcResult(GetEpochScheduleResult);
-
-/**
  * Expected JSON RPC response for the "getLeaderSchedule" message
  */
 const GetLeaderScheduleRpcResult = jsonRpcResult(GetLeaderScheduleResult);
-
-/**
- * Expected JSON RPC response for the "minimumLedgerSlot" and "getFirstAvailableBlock" messages
- */
-const SlotRpcResult = jsonRpcResult(number());
 
 /**
  * Supply
@@ -1794,21 +1747,6 @@ export type TokenAccountBalancePair = {
   /** Token amount as string, accounts for decimals */
   uiAmountString?: string;
 };
-
-/**
- * Expected JSON RPC response for the "getTokenLargestAccounts" message
- */
-const GetTokenLargestAccountsResult = jsonRpcResultAndContext(
-  array(
-    pick({
-      address: PublicKeyFromString,
-      amount: string(),
-      uiAmount: nullable(number()),
-      decimals: number(),
-      uiAmountString: optional(string()),
-    }),
-  ),
-);
 
 /**
  * Expected JSON RPC response for the "getTokenAccountsByOwner" message
@@ -1938,21 +1876,6 @@ const StakeActivationResult = pick({
  */
 
 const GetConfirmedSignaturesForAddress2RpcResult = jsonRpcResult(
-  array(
-    pick({
-      signature: string(),
-      slot: number(),
-      err: TransactionErrorResult,
-      memo: nullable(string()),
-      blockTime: optional(nullable(number())),
-    }),
-  ),
-);
-
-/**
- * Expected JSON RPC response for the "getSignaturesForAddress" message
- */
-const GetSignaturesForAddressRpcResult = jsonRpcResult(
   array(
     pick({
       signature: string(),
@@ -2136,27 +2059,6 @@ const ContactInfoResult = pick({
   rpc: nullable(string()),
   version: nullable(string()),
 });
-
-const VoteAccountInfoResult = pick({
-  votePubkey: string(),
-  nodePubkey: string(),
-  activatedStake: number(),
-  epochVoteAccount: boolean(),
-  epochCredits: array(tuple([number(), number(), number()])),
-  commission: number(),
-  lastVote: number(),
-  rootSlot: nullable(number()),
-});
-
-/**
- * Expected JSON RPC response for the "getVoteAccounts" message
- */
-const GetVoteAccounts = jsonRpcResult(
-  pick({
-    current: array(VoteAccountInfoResult),
-    delinquent: array(VoteAccountInfoResult),
-  }),
-);
 
 const ConfirmationStatus = union([
   literal('processed'),
@@ -2562,34 +2464,9 @@ const GetRecentBlockhashAndContextRpcResult = jsonRpcResultAndContext(
   }),
 );
 
-/**
- * Expected JSON RPC response for the "getLatestBlockhash" message
- */
-const GetLatestBlockhashRpcResult = jsonRpcResultAndContext(
-  pick({
-    blockhash: string(),
-    lastValidBlockHeight: number(),
-  }),
-);
-
-/**
- * Expected JSON RPC response for the "isBlockhashValid" message
- */
-const IsBlockhashValidRpcResult = jsonRpcResultAndContext(boolean());
-
-const PerfSampleResult = pick({
-  slot: number(),
-  numTransactions: number(),
-  numSlots: number(),
-  samplePeriodSecs: number(),
-});
-
 /*
  * Expected JSON RPC response for "getRecentPerformanceSamples" message
  */
-const GetRecentPerformanceSamplesRpcResult = jsonRpcResult(
-  array(PerfSampleResult),
-);
 
 /**
  * Expected JSON RPC response for the "getFeeCalculatorForBlockhash" message
@@ -3114,7 +2991,6 @@ export class Connection {
    * WARNING: Experimental API, may change!
    * The following are to test the new experimental web3.js API.
    */
-  /** @internal */ _EXPERIMENTAL_rpcTransport: IRpcTransport;
   /** @internal */ _EXPERIMENTAL_solanaRpc: Rpc<SolanaRpcMethods>;
 
   /**
@@ -3196,12 +3072,11 @@ export class Connection {
       'logsNotification',
       this._wsOnLogsNotification.bind(this),
     );
-    /** Experimental */
-    this._EXPERIMENTAL_rpcTransport = createDefaultRpcTransport({
-      url: endpoint,
-    });
+    /** EXPERIMENTAL */
     this._EXPERIMENTAL_solanaRpc = createSolanaRpc({
-      transport: this._EXPERIMENTAL_rpcTransport,
+      transport: createDefaultRpcTransport({
+        url: endpoint,
+      }),
     });
   }
 
@@ -3406,18 +3281,18 @@ export class Connection {
     commitment?: 'confirmed' | 'finalized';
     minContextSlot?: bigint;
     limit?: number;
-    before?: EXPERIMENTAL_TransactionSignature;
-    until?: EXPERIMENTAL_TransactionSignature;
+    before?: TransactionSignature;
+    until?: TransactionSignature;
   }> {
     if (options) {
       const minContextSlot = options.minContextSlot
         ? BigInt(options.minContextSlot)
         : undefined;
       const before = options.before
-        ? (options.before as EXPERIMENTAL_TransactionSignature)
+        ? (options.before as TransactionSignature)
         : undefined;
       const until = options.before
-        ? (options.before as EXPERIMENTAL_TransactionSignature)
+        ? (options.before as TransactionSignature)
         : undefined;
       return {
         commitment,
@@ -3788,7 +3663,6 @@ export class Connection {
     tokenMintAddress: PublicKey,
     commitment?: Commitment,
   ): Promise<RpcResponseAndContext<TokenAmount>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const args = this._buildArgs([tokenMintAddress.toBase58()], commitment);
     const unsafeRes = await this._rpcRequest('getTokenSupply', args);
     const res = create(unsafeRes, jsonRpcResultAndContext(TokenAmountResult));
@@ -3805,7 +3679,6 @@ export class Connection {
     tokenAddress: PublicKey,
     commitment?: Commitment,
   ): Promise<RpcResponseAndContext<TokenAmount>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const args = this._buildArgs([tokenAddress.toBase58()], commitment);
     const unsafeRes = await this._rpcRequest('getTokenAccountBalance', args);
     const res = create(unsafeRes, jsonRpcResultAndContext(TokenAmountResult));
@@ -3828,7 +3701,6 @@ export class Connection {
     filter: TokenAccountsFilter,
     commitmentOrConfig?: Commitment | GetTokenAccountsByOwnerConfig,
   ): Promise<RpcResponseAndContext<GetProgramAccountsResponse>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     let _args: any[] = [ownerAddress.toBase58()];
@@ -3864,7 +3736,6 @@ export class Connection {
       Array<{pubkey: PublicKey; account: AccountInfo<ParsedAccountData>}>
     >
   > {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     let _args: any[] = [ownerAddress.toBase58()];
     if ('mint' in filter) {
       _args.push({mint: filter.mint.toBase58()});
@@ -3890,7 +3761,6 @@ export class Connection {
   async getLargestAccounts(
     config?: GetLargestAccountsConfig,
   ): Promise<RpcResponseAndContext<Array<AccountBalancePair>>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const arg = {
       ...config,
       commitment: (config && config.commitment) || this.commitment,
@@ -4040,7 +3910,6 @@ export class Connection {
   ): Promise<
     RpcResponseAndContext<(AccountInfo<Buffer | ParsedAccountData> | null)[]>
   > {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const keys = publicKeys.map(key => key.toBase58());
     const args = this._buildArgs([keys], commitment, 'jsonParsed', config);
@@ -4065,7 +3934,6 @@ export class Connection {
     publicKeys: PublicKey[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
   ): Promise<RpcResponseAndContext<(AccountInfo<Buffer> | null)[]>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const keys = publicKeys.map(key => key.toBase58());
@@ -4091,7 +3959,6 @@ export class Connection {
     publicKeys: PublicKey[],
     commitmentOrConfig?: Commitment | GetMultipleAccountsConfig,
   ): Promise<(AccountInfo<Buffer> | null)[]> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const res = await this.getMultipleAccountsInfoAndContext(
       publicKeys,
       commitmentOrConfig,
@@ -4107,7 +3974,6 @@ export class Connection {
     commitmentOrConfig?: Commitment | GetStakeActivationConfig,
     epoch?: number,
   ): Promise<StakeActivationData> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const args = this._buildArgs(
@@ -4154,7 +4020,6 @@ export class Connection {
     | GetProgramAccountsResponse
     | RpcResponseAndContext<GetProgramAccountsResponse>
   > {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
     const {encoding, ...configWithoutEncoding} = config || {};
@@ -4193,7 +4058,6 @@ export class Connection {
       account: AccountInfo<Buffer | ParsedAccountData>;
     }>
   > {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(configOrCommitment);
     const args = this._buildArgs(
@@ -4313,7 +4177,7 @@ export class Connection {
     }>((resolve, reject) => {
       try {
         signatureSubscriptionId = this.onSignature(
-          signature,
+          signature as TransactionSignature,
           (result: SignatureResult, context: Context) => {
             signatureSubscriptionId = undefined;
             const response = {
@@ -4344,7 +4208,9 @@ export class Connection {
         (async () => {
           await subscriptionSetupPromise;
           if (done) return;
-          const response = await this.getSignatureStatus(signature);
+          const response = await this.getSignatureStatus(
+            signature as TransactionSignature,
+          );
           if (done) return;
           if (response == null) {
             return;
@@ -4473,7 +4339,6 @@ export class Connection {
     commitment?: Commitment;
     strategy: DurableNonceTransactionConfirmationStrategy;
   }) {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     let done: boolean = false;
     const expiryPromise = new Promise<{
       __type: TransactionStatus.NONCE_INVALID;
@@ -4611,7 +4476,6 @@ export class Connection {
     commitment?: Commitment;
     signature: string;
   }) {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     let timeoutId;
     const expiryPromise = new Promise<{
       __type: TransactionStatus.TIMED_OUT;
@@ -4664,7 +4528,6 @@ export class Connection {
    * Return the list of nodes that are currently participating in the cluster
    */
   async getClusterNodes(): Promise<Array<ContactInfo>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const unsafeRes = await this._rpcRequest('getClusterNodes', []);
     const res = create(unsafeRes, jsonRpcResult(array(ContactInfoResult)));
     if ('error' in res) {
@@ -4711,7 +4574,6 @@ export class Connection {
   async getSlotLeader(
     commitmentOrConfig?: Commitment | GetSlotLeaderConfig,
   ): Promise<string> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const args = this._buildArgs(
@@ -4755,7 +4617,6 @@ export class Connection {
     signature: TransactionSignature,
     config?: SignatureStatusConfig,
   ): Promise<RpcResponseAndContext<SignatureStatus | null>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {context, value: values} = await this.getSignatureStatuses(
       [signature],
       config,
@@ -4772,7 +4633,6 @@ export class Connection {
     signatures: Array<TransactionSignature>,
     config?: SignatureStatusConfig,
   ): Promise<RpcResponseAndContext<Array<SignatureStatus | null>>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const params: any[] = [signatures];
     if (config) {
       params.push(config);
@@ -4809,7 +4669,6 @@ export class Connection {
    * @deprecated Deprecated since v1.2.8. Please use {@link getSupply} instead.
    */
   async getTotalSupply(commitment?: Commitment): Promise<number> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     const result = await this.getSupply({
       commitment,
       excludeNonCirculatingAccountsList: true,
@@ -4823,7 +4682,6 @@ export class Connection {
   async getInflationGovernor(
     commitment?: Commitment,
   ): Promise<InflationGovernor> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const args = this._buildArgs([], commitment);
     const unsafeRes = await this._rpcRequest('getInflationGovernor', args);
     const res = create(unsafeRes, GetInflationGovernorRpcResult);
@@ -4858,7 +4716,6 @@ export class Connection {
    * Fetch the specific inflation values for the current epoch
    */
   async getInflationRate(): Promise<InflationRate> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const unsafeRes = await this._rpcRequest('getInflationRate', []);
     const res = create(unsafeRes, GetInflationRateRpcResult);
     if ('error' in res) {
@@ -4902,7 +4759,6 @@ export class Connection {
    * @return {Promise<RpcResponseAndContext<LeaderSchedule>>}
    */
   async getLeaderSchedule(): Promise<LeaderSchedule> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const unsafeRes = await this._rpcRequest('getLeaderSchedule', []);
     const res = create(unsafeRes, GetLeaderScheduleRpcResult);
     if ('error' in res) {
@@ -4919,7 +4775,6 @@ export class Connection {
     dataLength: number,
     commitment?: Commitment,
   ): Promise<number> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const args = this._buildArgs([dataLength], commitment);
     const unsafeRes = await this._rpcRequest(
       'getMinimumBalanceForRentExemption',
@@ -4945,7 +4800,6 @@ export class Connection {
       feeCalculator: FeeCalculator;
     }>
   > {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     const args = this._buildArgs([], commitment);
     const unsafeRes = await this._rpcRequest('getRecentBlockhash', args);
     const res = create(unsafeRes, GetRecentBlockhashAndContextRpcResult);
@@ -4962,7 +4816,6 @@ export class Connection {
   async getRecentPerformanceSamples(
     limit?: number,
   ): Promise<Array<PerfSample>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     return await this._EXPERIMENTAL_solanaRpc
       .getRecentPerformanceSamples(limit)
       .send()
@@ -4984,7 +4837,6 @@ export class Connection {
     blockhash: Blockhash,
     commitment?: Commitment,
   ): Promise<RpcResponseAndContext<FeeCalculator | null>> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     const args = this._buildArgs([blockhash], commitment);
     const unsafeRes = await this._rpcRequest(
       'getFeeCalculatorForBlockhash',
@@ -5009,7 +4861,6 @@ export class Connection {
     message: VersionedMessage,
     commitment?: Commitment,
   ): Promise<RpcResponseAndContext<number | null>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const wireMessage = toBuffer(message.serialize()).toString('base64');
     const args = this._buildArgs([wireMessage], commitment);
     const unsafeRes = await this._rpcRequest('getFeeForMessage', args);
@@ -5030,7 +4881,6 @@ export class Connection {
   async getRecentPrioritizationFees(
     config?: GetRecentPrioritizationFeesConfig,
   ): Promise<RecentPrioritizationFees[]> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const accounts = config?.lockedWritableAccounts?.map(key => key.toBase58());
     const args = this._buildArgs(accounts?.length ? [accounts] : []);
     const unsafeRes = await this._rpcRequest(
@@ -5055,7 +4905,6 @@ export class Connection {
   async getRecentBlockhash(
     commitment?: Commitment,
   ): Promise<{blockhash: Blockhash; feeCalculator: FeeCalculator}> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     try {
       const res = await this.getRecentBlockhashAndContext(commitment);
       return res.value;
@@ -5085,20 +4934,16 @@ export class Connection {
   async getLatestBlockhashAndContext(
     commitmentOrConfig?: Commitment | GetLatestBlockhashConfig,
   ): Promise<RpcResponseAndContext<BlockhashWithExpiryBlockHeight>> {
-    const {commitment, config} =
-      extractCommitmentFromConfig(commitmentOrConfig);
-    const args = this._buildArgs(
-      [],
-      commitment,
-      undefined /* encoding */,
-      config,
-    );
-    const unsafeRes = await this._rpcRequest('getLatestBlockhash', args);
-    const res = create(unsafeRes, GetLatestBlockhashRpcResult);
-    if ('error' in res) {
-      throw new SolanaJSONRPCError(res.error, 'failed to get latest blockhash');
-    }
-    return res.result;
+    /** EXPERIMENTAL: ✅ */
+    return await this._EXPERIMENTAL_solanaRpc
+      .getLatestBlockhash(this.castToExperimentalCommitment(commitmentOrConfig))
+      .send()
+      .then(res => {
+        return {
+          context: this.castToContext(res.context),
+          value: this.castToBlockhashWithExpiryBlockHeight(res.value),
+        };
+      });
   }
 
   /**
@@ -5110,10 +4955,7 @@ export class Connection {
   ): Promise<RpcResponseAndContext<boolean>> {
     /** EXPERIMENTAL: ✅ */
     return await this._EXPERIMENTAL_solanaRpc
-      .isBlockhashValid(
-        blockhash as EXPERIMENTAL_Blockhash,
-        this.castToExperimentalCommitment(rawConfig),
-      )
+      .isBlockhashValid(blockhash, this.castToExperimentalCommitment(rawConfig))
       .send()
       .then(res => {
         return {
@@ -5133,7 +4975,6 @@ export class Connection {
    * Fetch the node version
    */
   async getVersion(): Promise<Version> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const unsafeRes = await this._rpcRequest('getVersion', []);
     const res = create(unsafeRes, jsonRpcResult(VersionResult));
     if ('error' in res) {
@@ -5146,7 +4987,6 @@ export class Connection {
    * Fetch the genesis hash
    */
   async getGenesisHash(): Promise<string> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const unsafeRes = await this._rpcRequest('getGenesisHash', []);
     const res = create(unsafeRes, jsonRpcResult(string()));
     if ('error' in res) {
@@ -5220,7 +5060,6 @@ export class Connection {
     | VersionedNoneModeBlockResponse
     | null
   > {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} = extractCommitmentFromConfig(rawConfig);
     const args = this._buildArgsAtLeastConfirmed(
       [slot],
@@ -5354,17 +5193,27 @@ export class Connection {
       commitmentOrConfig?: Commitment | GetBlockHeightConfig,
     ): Promise<number> => {
       /** EXPERIMENTAL: ✅ */
-      // Works, but no longer uses `requestPromises`? Prob should investigate.
-      return await this._EXPERIMENTAL_solanaRpc
-        .getBlockHeight(this.castToExperimentalCommitment(commitmentOrConfig))
-        .send()
-        .then(res => Number(res))
-        .catch(e => {
-          throw new SolanaJSONRPCError(
-            e,
-            'failed to get block height information',
-          );
-        });
+      const config = this.castToExperimentalCommitment(commitmentOrConfig);
+      const requestHash = fastStableStringify(config);
+      requestPromises[requestHash] =
+        requestPromises[requestHash] ??
+        (async () => {
+          try {
+            return await this._EXPERIMENTAL_solanaRpc
+              .getBlockHeight(config)
+              .send()
+              .then(res => Number(res))
+              .catch(e => {
+                throw new SolanaJSONRPCError(
+                  e,
+                  'failed to get block height information',
+                );
+              });
+          } finally {
+            delete requestPromises[requestHash];
+          }
+        })();
+      return await requestPromises[requestHash];
     };
   })();
 
@@ -5501,7 +5350,6 @@ export class Connection {
     signatures: TransactionSignature[],
     commitmentOrConfig?: GetVersionedTransactionConfig | Finality,
   ): Promise<(ParsedTransactionWithMeta | null)[]> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const batch = signatures.map(signature => {
@@ -5563,7 +5411,6 @@ export class Connection {
     signatures: TransactionSignature[],
     commitmentOrConfig: GetVersionedTransactionConfig | Finality,
   ): Promise<(VersionedTransactionResponse | null)[]> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const {commitment, config} =
       extractCommitmentFromConfig(commitmentOrConfig);
     const batch = signatures.map(signature => {
@@ -5613,7 +5460,6 @@ export class Connection {
     slot: number,
     commitment?: Finality,
   ): Promise<ConfirmedBlock> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     const args = this._buildArgsAtLeastConfirmed([slot], commitment);
     const unsafeRes = await this._rpcRequest('getConfirmedBlock', args);
     const res = create(unsafeRes, GetConfirmedBlockRpcResult);
@@ -5685,7 +5531,6 @@ export class Connection {
     slot: number,
     commitment?: Finality,
   ): Promise<BlockSignatures> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const args = this._buildArgsAtLeastConfirmed(
       [slot],
       commitment,
@@ -5716,7 +5561,6 @@ export class Connection {
     slot: number,
     commitment?: Finality,
   ): Promise<BlockSignatures> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const args = this._buildArgsAtLeastConfirmed(
       [slot],
       commitment,
@@ -5747,7 +5591,6 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ConfirmedTransaction | null> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     const args = this._buildArgsAtLeastConfirmed([signature], commitment);
     const unsafeRes = await this._rpcRequest('getConfirmedTransaction', args);
     const res = create(unsafeRes, GetTransactionRpcResult);
@@ -5775,7 +5618,6 @@ export class Connection {
     signature: TransactionSignature,
     commitment?: Finality,
   ): Promise<ParsedConfirmedTransaction | null> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     const args = this._buildArgsAtLeastConfirmed(
       [signature],
       commitment,
@@ -5801,7 +5643,6 @@ export class Connection {
     signatures: TransactionSignature[],
     commitment?: Finality,
   ): Promise<(ParsedConfirmedTransaction | null)[]> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     const batch = signatures.map(signature => {
       const args = this._buildArgsAtLeastConfirmed(
         [signature],
@@ -5844,7 +5685,6 @@ export class Connection {
     startSlot: number,
     endSlot: number,
   ): Promise<Array<TransactionSignature>> {
-    /** EXPERIMENTAL: 🪦 Deprecated */
     let options: any = {};
 
     let firstAvailableBlock = await this.getFirstAvailableBlock();
@@ -5898,7 +5738,9 @@ export class Connection {
       address,
       options,
     );
-    return confirmedSignatureInfo.map(info => info.signature);
+    return confirmedSignatureInfo.map(
+      info => info.signature as TransactionSignature,
+    );
   }
 
   /**
@@ -5914,7 +5756,6 @@ export class Connection {
     options?: ConfirmedSignaturesForAddress2Options,
     commitment?: Finality,
   ): Promise<Array<ConfirmedSignatureInfo>> {
-    /** EXPERIMENTAL: 🏷️ Not available yet */
     const args = this._buildArgsAtLeastConfirmed(
       [address.toBase58()],
       commitment,
@@ -6055,7 +5896,7 @@ export class Connection {
         `airdrop to ${to.toBase58()} failed`,
       );
     }
-    return res.result;
+    return res.result as TransactionSignature;
   }
 
   /**
@@ -6430,7 +6271,7 @@ export class Connection {
         logs,
       );
     }
-    return res.result;
+    return res.result as TransactionSignature;
   }
 
   /**

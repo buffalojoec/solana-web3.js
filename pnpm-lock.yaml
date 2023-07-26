@@ -371,6 +371,15 @@ importers:
       '@solana/buffer-layout':
         specifier: ^4.0.0
         version: 4.0.0
+      '@solana/rpc-core':
+        specifier: workspace:2.0.0-development
+        version: link:../rpc-core
+      '@solana/transactions':
+        specifier: 2.0.0-experimental.743e0a6
+        version: 2.0.0-experimental.743e0a6
+      '@solana/web3.js-experimental':
+        specifier: workspace:2.0.0-development
+        version: link:../library
       agentkeepalive:
         specifier: ^4.2.1
         version: 4.2.1
@@ -3864,6 +3873,13 @@ packages:
       - supports-color
       - utf-8-validate
     dev: true
+
+  /@solana/transactions@2.0.0-experimental.743e0a6:
+    resolution: {integrity: sha512-eg0LTgSWerDVo8oKQg9B1rlzpZ7G9Pu1DhFxgBOuyVz2j6eFfQZsSpKuRz9hs55V05Pm6LBq2C69qKXBti829g==}
+    dependencies:
+      '@metaplex-foundation/umi': link:../../../../../home/sol/src/umi-git/packages/umi
+      '@metaplex-foundation/umi-serializer-data-view': link:../../../../../home/sol/src/umi-git/packages/umi-serializer-data-view
+    dev: false
 
   /@solana/web3.js@1.77.3:
     resolution: {integrity: sha512-PHaO0BdoiQRPpieC1p31wJsBaxwIOWLh8j2ocXNKX8boCQVldt26Jqm2tZE4KlrvnCIV78owPLv1pEUgqhxZ3w==}
