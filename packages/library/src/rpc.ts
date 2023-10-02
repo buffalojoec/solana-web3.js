@@ -5,6 +5,7 @@ import {
     SolanaRpcSubscriptions,
 } from '@solana/rpc-core';
 import { createJsonRpc, createJsonSubscriptionRpc } from '@solana/rpc-transport';
+import { createRpcGraphQL, RpcGraphQL } from '@solana/rpc-graphql';
 import type { Rpc, RpcSubscriptions } from '@solana/rpc-transport/dist/types/json-rpc-types';
 
 import { DEFAULT_RPC_CONFIG } from './rpc-default-config';
@@ -23,4 +24,8 @@ export function createSolanaRpcSubscriptions(
         ...config,
         api: createSolanaRpcSubscriptionsApi(DEFAULT_RPC_CONFIG),
     });
+}
+
+export function createSolanaRpcGraphQL(rpc: Rpc<SolanaRpcMethods>): RpcGraphQL {
+    return createRpcGraphQL(rpc);
 }
